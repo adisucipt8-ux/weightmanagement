@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: 20
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
@@ -44,18 +44,17 @@ jobs:
         run: |
           chmod +x gradlew
           if [ -n "$KEYSTORE_B64" ]; then
-            echo "Build rilis bertanda tangan"
-            ./gradlew assembleRelease --no-daemon
             echo "$KEYSTORE_B64" | base64 -d > release.jks
-            BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-            "$BT/zipalign" -p -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
-            "$BT/apksigner" sign --ks release.jks --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD --out ../Sehat12.apk aligned.apk
-            rm -f release.jks
           else
-            echo "Belum ada kunci rilis: build versi debug"
-            ./gradlew assembleDebug --no-daemon
-            cp app/build/outputs/apk/debug/app-debug.apk ../Sehat12.apk
+            cp ../android-signing/sehat12-release.jks release.jks
+            export KEYSTORE_PASSWORD="$(cat ../android-signing/password.txt)"
           fi
+          ./gradlew assembleRelease --no-daemon
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/zipalign" -p -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          "$BT/apksigner" sign --ks release.jks --ks-key-alias sehat12 --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD --out ../Sehat12.apk aligned.apk
+          "$BT/apksigner" verify --print-certs ../Sehat12.apk | head -3
+          rm -f release.jks
 
       - name: Simpan APK sebagai artefak
         uses: actions/upload-artifact@v4
@@ -73,3 +72,4 @@ jobs:
           body: |
             Unduh **Sehat12.apk** di bawah, lalu buka file-nya di HP Android untuk memasang.
             Jika muncul peringatan "sumber tidak dikenal", izinkan pemasangan dari browser atau aplikasi file yang kamu pakai.
+            Update bisa langsung dipasang di atas versi sebelumnya tanpa menghapus data (kecuali dari versi debug 1.0.1: copot dulu sekali).

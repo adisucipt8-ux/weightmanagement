@@ -27,8 +27,8 @@ Sehat12 adalah alat bantu gaya hidup, bukan pengganti pemeriksaan dokter. Aplika
 
 APK dibuat otomatis oleh GitHub Actions (`.github/workflows/android.yml`) setiap ada perubahan di branch `main`, memakai [Capacitor](https://capacitorjs.com/) untuk membungkus aplikasi web. Hasilnya terbit di halaman Releases.
 
-- Tanpa kunci rilis, workflow membuat APK versi debug (bisa dipasang, tapi pembaruan dengan kunci berbeda harus copot pasang dulu).
-- Untuk APK rilis bertanda tangan tetap, tambahkan secret repo `ANDROID_KEYSTORE_BASE64` (file keystore dalam base64, alias `sehat12`) dan `ANDROID_KEYSTORE_PASSWORD`.
+- APK ditandatangani dengan kunci tetap di `android-signing/` (lihat README di folder itu), jadi update bisa dipasang di atas versi lama tanpa kehilangan data.
+- Secret repo `ANDROID_KEYSTORE_BASE64` dan `ANDROID_KEYSTORE_PASSWORD`, bila diisi, dipakai lebih dulu.
 
 Build lokal (butuh Android SDK dan Java 17): `npm install && npm run android:prepare && cd android && ./gradlew assembleDebug`.
 
