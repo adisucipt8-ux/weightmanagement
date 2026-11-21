@@ -745,14 +745,24 @@ function vAkun(){
       </div>
       <div><div class="small muted" style="margin-bottom:6px">Kondisi kesehatan</div>${SCREEN.map(s=>`<label class="check" style="margin-bottom:6px"><input type="checkbox" data-pfscr="${esc(s)}" ${(p.screen||[]).includes(s)?"checked":""}><span class="small">${esc(s)}</span></label>`).join("")}</div>
     </div>
-    <div class="card"><h3>Cadangan data</h3><p class="small muted">Data hanya ada di HP ini. Simpan cadangan secara berkala supaya tidak hilang saat ganti HP atau menghapus data browser. Foto tidak ikut dicadangkan.</p>
+    <div class="card"><h3>Cadangan data</h3><p class="small muted">Data hanya ada di HP ini. Simpan cadangan secara berkala (misalnya kirim ke Google Drive atau WhatsApp sendiri) supaya tidak hilang saat ganti HP atau aplikasi dihapus. Foto tidak ikut dicadangkan.</p>
       <div class="row wrap"><button class="btn ghost small" data-act="export">Unduh cadangan</button><button class="btn ghost small" data-act="import">Pulihkan dari cadangan</button></div></div>
     <div class="card"><h3>Tentang</h3><p class="small muted">Sehat12 adalah alat bantu gaya hidup berbasis pedoman Kemenkes (Isi Piringku), WHO, dan ACSM. Bukan pengganti pemeriksaan dokter. Angka kalori adalah perkiraan. Rujuk ke tenaga kesehatan bila IMT ≥35 atau <17, punya penyakit kronis, hamil/menyusui, usia <18 atau lansia, atau mengalami nyeri dada, pingsan, sesak, atau tanda gangguan makan.</p></div>
     <div class="card"><h3>Hapus semua data</h3>
       ${confirmReset?`<p class="small">Yakin? Semua catatan, foto, dan XP di HP ini akan terhapus permanen.</p><div class="row"><button class="btn ghost" data-act="resetno">Batal</button><button class="btn" style="background:var(--crit);flex:1" data-act="resetyes">Ya, hapus semua</button></div>`:`<button class="btn ghost danger" data-act="reset">Hapus semua data</button>`}</div>
   </div>`;
 }
-function exportData(){
+const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+async function exportData(){
+  if(NATIVE){
+    try{
+      const {Filesystem, Share} = window.Capacitor.Plugins, path = `sehat12-cadangan-${today()}.json`;
+      await Filesystem.writeFile({path, data: JSON.stringify(S), directory:"CACHE", encoding:"utf8"});
+      const {uri} = await Filesystem.getUri({path, directory:"CACHE"});
+      await Share.share({title:"Cadangan Sehat12", text:"File cadangan data Sehat12", url:uri, dialogTitle:"Simpan cadangan ke…"});
+    }catch(e){ if(!/cancel/i.test(String(e && e.message))) toast("Cadangan gagal dibuat. Coba lagi.") }
+    return;
+  }
   const blob = new Blob([JSON.stringify(S,null,1)],{type:"application/json"});
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `sehat12-cadangan-${today()}.json`; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove() }, 500);
   toast("Cadangan diunduh");
@@ -847,5 +857,15 @@ document.addEventListener("submit", e => { if(e.target.id==="askf"){ e.preventDe
 document.addEventListener("visibilitychange", () => { if(!document.hidden && !draft) render() });
 
 render();
-if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
+if(NATIVE){
+  // Tombol kembali Android: tutup jendela, kembali ke Beranda, baru keluar aplikasi
+  try{ window.Capacitor.Plugins.App.addListener("backButton", () => {
+    const m = $("#modal");
+    if(m && !m.hidden){ m.hidden = true; render(); }
+    else if(draft){ draft = null; query = ""; render(); }
+    else if(S.profile && S.startDate && tab !== "beranda"){ go("beranda"); }
+    else if(!S.profile && welcomeSeen){ if(onbStep>0){ onbStep--; } else { welcomeSeen=false; } render(); }
+    else window.Capacitor.Plugins.App.exitApp();
+  }); }catch(e){}
+} else if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();

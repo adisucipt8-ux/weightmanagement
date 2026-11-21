@@ -1,0 +1,75 @@
+name: Build APK Android
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Pasang dependensi
+        run: npm install --no-audit --no-fund
+
+      - name: Siapkan proyek Android
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 1.0.${{ github.run_number }}
+        run: npm run android:prepare
+
+      - name: Build APK
+        working-directory: android
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "Build rilis bertanda tangan"
+            ./gradlew assembleRelease --no-daemon
+            echo "$KEYSTORE_B64" | base64 -d > release.jks
+            BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+            "$BT/zipalign" -p -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+            "$BT/apksigner" sign --ks release.jks --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD --out ../Sehat12.apk aligned.apk
+            rm -f release.jks
+          else
+            echo "Belum ada kunci rilis: build versi debug"
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk ../Sehat12.apk
+          fi
+
+      - name: Simpan APK sebagai artefak
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sehat12-apk
+          path: Sehat12.apk
+
+      - name: Terbitkan di halaman Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Sehat12 versi 1.0.${{ github.run_number }}
+          make_latest: true
+          files: Sehat12.apk
+          body: |
+            Unduh **Sehat12.apk** di bawah, lalu buka file-nya di HP Android untuk memasang.
+            Jika muncul peringatan "sumber tidak dikenal", izinkan pemasangan dari browser atau aplikasi file yang kamu pakai.
